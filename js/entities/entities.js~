@@ -1,0 +1,303 @@
+/**
+ * a zombie entityalpos
+ * note : we don't use EntityObject, since we wont' use regular collision, etc..
+ */
+var guns=[];
+
+game.ZombieEntity = me.AnimationSheet.extend(
+{	
+	init:function (x, y) {
+		// call the constructor
+		this.parent(x, y , me.loader.getImage("zombie"), 32, 32);
+		
+		// idle animation
+		this.addAnimation ("idle",  [0]);
+		// laugh animation
+		this.addAnimation ("walk",  [0,1,2,3,2,1,0]);
+		this.addAnimation ("walkdown",  [0,1,2]);
+		this.addAnimation ("walkright",  [12,13,14]);
+		this.addAnimation ("walkleft",  [24,25,26]);
+		this.addAnimation ("walkup",  [36,37,38]);
+		// touch animation
+		this.addAnimation ("touch",  [4,5,6,4,5,6]);
+		
+		// set default one
+		//this.setCurrentAnimation("idle");
+		
+		// means fully hidden in the hole
+		this.isVisible = false;
+		this.isOut = false;
+		this.timer = 0;
+		this.strength=20;
+		
+		this.initialPos = 0;
+		
+		// tween to display/shot the zombies
+		this.displayTween = null;
+		this.shotTween = null;
+		
+		// register on mouse event
+		me.input.registerPointerEvent('mousedown', this, this.onMouseDown.bind(this));
+
+	},
+	
+	
+	/**
+	 * callback for mouse click
+	 */
+	onMouseDown : function() {
+		if (this.isOut == true) {
+			this.isOut = false;
+			// set touch animation
+			this.setCurrentAnimation("touch", this.shot.bind(this));
+			// make it flicker
+			//this.flicker(20);
+			// play ow FX
+			//me.audio.play("ow");
+
+			// stop propagating the event
+			return false;
+			
+		};
+	},
+	
+	
+	/**
+	 * display the zombie
+	 * goes out of the hole
+	 */
+	display : function() {
+	
+
+		var i=this.initialPos;
+		if(this.pos.x>game.path[i].x)
+				this.setCurrentAnimation("walkright");
+		else if(this.pos.x<game.path[i].x)
+				this.setCurrentAnimation("walkleft");
+		else if(this.pos.y>game.path[i].y)
+				this.setCurrentAnimation("walkup");
+		else
+				this.setCurrentAnimation("walkdown");
+		if(this.initialPos<24)
+			this.initialPos=this.initialPos+1;
+			//console.log(this.pos.x);
+		this.displayTween = new me.Tween(this.pos).to({x:game.path[i].x,y: game.path[i].y }, Math.abs(this.pos.x-game.path[i].x + this.pos.y-game.path[i].y)*10);
+		this.displayTween.easing(me.Tween.Easing.Linear.EaseNone);
+		this.displayTween.onComplete(this.display.bind(this));
+		this.displayTween.start();
+		// the zombie is visible
+		this.isVisible = true;
+	},
+	
+	/**
+	 * callback when fully visible
+	 */
+	onDisplayed : function() {
+		this.isOut = true;
+		this.timer = me.timer.getTime();
+	},
+	
+	/**
+	 * shot the zombie
+	 * goes into the hole
+	 */	
+	shot : function() {
+		this.flicker(20);
+		this.strength=this.strength-1;
+		if(this.strength==0)
+			this.setCurrentAnimation("idle");
+		/*this.displayTween = new me.Tween(this.pos).to({y: finalpos }, 200);
+		this.displayTween.easing(me.Tween.Easing.Quadratic.EaseIn);
+		this.displayTween.onComplete(this.onHidden.bind(this));
+		this.displayTween.start()*/
+	},
+
+	/**
+	 * callback when fully visible
+	 */
+	onHidden : function() {
+		this.isVisible = false;
+		// set default one
+		this.setCurrentAnimation("idle");
+	},
+
+	
+	/**
+	 * update the zombie
+	 */
+	update : function ()
+	{
+		//console.log("first one");
+		if (this.isVisible) {
+			// call the parent function to manage animation
+			this.parent();
+		
+			// shot the mode after 1/2 sec
+			if (this.isOut===true) {
+				if ((me.timer.getTime() - this.timer) > 500){
+					this.isOut = false;
+					// set default one
+					this.setCurrentAnimation("walk");
+					this.shot();
+					// play laugh FX
+					//me.audio.play("laugh");
+				}
+			}
+		}
+		return this.isVisible;
+	}
+});
+game.ShotgunSpawner = me.AnimationSheet.extend(
+{	
+	init:function (x, y) {
+		
+		// call the constructor
+		this.parent(x, y , me.loader.getImage("shotgun"), 32, 32);
+		this.isVisible = true;
+		this.addAnimation ("idle",  [0]);
+		// laugh animation
+		this.addAnimation ("walk",  [0,1,2,3,2,1,0]);
+		this.addAnimation ("walkdown",  [0,1,2]);
+		this.addAnimation ("walkright",  [12,13,14]);
+		this.addAnimation ("walkleft",  [24,25,26]);
+		this.addAnimation ("walkup",  [36,37,38]);
+		// touch animation
+		this.addAnimation ("touch",  [4,5,6,4,5,6]);
+		this.setCurrentAnimation("idle");
+		// register on mouse event
+		me.input.registerPointerEvent('click', this, this.onClick.bind(this));
+
+	},
+	
+	/**
+	 * callback for mouse click
+	 */
+	onClick : function() {
+			var gun = new game.ShotgunEntity(1100,200,me.loader.getImage("shotgun"), 128,124);
+			me.game.add(gun, 101);
+			me.game.sort();
+			guns.push(gun);
+			
+			return false;
+			
+		
+	},
+	
+	
+	/**
+	 * callback when fully visible
+	 */
+
+	update : function ()
+	{
+		return this.isVisible;
+	}
+});
+game.ShotgunEntity = me.AnimationSheet.extend(
+{	
+	init:function (x, y) {
+		this.placed=false;
+		
+		// call the constructor
+		this.parent(x, y , me.loader.getImage("shotgun"), 128, 124);
+		
+		// register on mouse event
+		me.input.registerPointerEvent('click', this, this.onClick.bind(this));
+
+	},
+	
+	/**
+	 * callback for mouse click
+	 */
+	onClick : function() {
+			if(this.placed==false){
+				this.placed=true;
+				this.pos = me.input.mouse.pos;
+			}
+			
+			return false;
+			
+		
+	},
+
+	
+	/**
+	 * shot the zombie
+	 * goes into the hole
+	 */	
+	shot : function() {
+		/*this.flicker(20);
+		this.strength=this.strength-1;
+		if(this.strength==0)
+			this.setCurrentAnimation("idle");
+		/*this.displayTween = new me.Tween(this.pos).to({y: finalpos }, 200);
+		this.displayTween.easing(me.Tween.Easing.Quadratic.EaseIn);
+		this.displayTween.onComplete(this.onHidden.bind(this));
+		this.displayTween.start()*/
+	},
+
+
+	
+	/**
+	 * update the zombie
+	 */
+	update : function ()
+	{	
+		if(!this.placed)
+			this.pos = me.input.mouse.pos;
+		return this.isVisible;
+	}
+});
+
+/**
+ * a zombie manager (to manage movement, etc..)
+ */
+game.ZombieManager = me.ObjectEntity.extend(
+{	
+	zombies : [],
+	
+	timer : 0,
+		
+	init: function ()
+	{
+		var settings = {};
+		settings.width = 50;
+		settings.height = 50;
+		// call the parent constructor
+		this.parent(0, 0, settings);
+		
+		// add the first row of zombies
+		for ( var i = 0; i < 9; i ++) {
+			this.zombies[i] = new game.ZombieEntity( 85, 0)
+			me.game.add (this.zombies[i], 30);
+			console.log(this.zombies[i].strength);
+		}
+		
+
+			
+		this.timer = me.timer.getTime();
+		
+	},
+
+	/*
+	 * update function
+	 */
+	update : function ()
+	{
+		// every 1/2 seconds display zombies randomly
+		//console.log("lastone");
+		if ((me.timer.getTime() - this.timer) > 500) {
+
+			for (var i = 0; i < 9; i+=3) {
+				var hole = Number.prototype.random(0,2) + i ;
+				if (!this.zombies[hole].isOut && !this.zombies[hole].isVisible) {
+					this.zombies[hole].display();
+				}
+			
+			}
+			this.timer = me.timer.getTime();
+		}
+ 		return false;
+	}
+	
+});
